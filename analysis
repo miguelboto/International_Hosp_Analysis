@@ -1,0 +1,566 @@
+library(tidyverse)
+library(readxl)
+library(ggthemes)
+library(ggrepel)
+library(gganimate)
+library(av)
+library(gifski)
+library(RColorBrewer)
+library(colorspace)
+library(knitr)
+library(jsonlite)
+library(curl)
+library(rjson)
+#maps
+
+library(ggmap)
+library(maps)
+library(mapdata)
+library(RgoogleMaps)
+
+
+
+GetMap("USA",
+  destfile = "USA.png",
+  size=c(640,640), zoom=18,
+  maptype = "roadmap")
+
+library(sf)
+
+library(rnaturalearth)
+library(rnaturalearthdata)
+
+library(rworldmap)
+
+# https://rpubs.com/rbatzing/mapping
+
+# charge simple maps
+
+map('worldHires',
+    region=c("USA"))
+
+newmap <- getMap(resolution = "low")
+
+plot(newmap, xlim = c(-110, -60), ylim = c(20, 85), asp = 1)
+
+points(usa_hosp_database$LONGITUDE, usa_hosp_database$LATITUDE, col = "blue", cex = .5)
+
+class(canadian_beds$Total)
+
+
+# CANADA
+
+establecimientos_canada <- inner_join(canadian_beds, Ministry_of_Health_Service_Provider_Locations_ontario, by = "NAME")
+
+establecimientos_canada  %>% mutate(COMMUNITY = reorder(COMMUNITY, Total)) %>% filter(Province == "ON") %>%
+  ggplot(aes(COMMUNITY, Total, fill = `Health region`)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(trans = "log2") +
+  xlab("")
+
+canadian_beds %>% mutate(NAME = reorder(NAME, Total)) %>%  filter(Province == "ON" & Total >= 40) %>%
+  ggplot(aes(NAME, Total), fill = `Health region`) +
+  geom_bar(stat="identity") +
+  xlab("Hospital") +
+  ylab("Total Beds") +
+  ggtitle("Ontario's Hospitals Rank @Miguel A. Boto") + 
+  coord_flip() +
+  scale_fill_gradient(low = "green", high = "blue", na.value = NA)
+
+canadian_beds %>%  mutate(`Type of hospital*` = reorder(`Type of hospital*`, Total)) %>%
+  ggplot(aes(`Type of hospital*`, Total, fill = Total)) +
+  geom_bar(stat="identity") +
+  xlab("Type of Hospitals") +
+  ylab("Total Beds") +
+  ggtitle("Type of Hospitals") + 
+  coord_flip() +
+  scale_fill_gradient(low = "green", high = "blue", na.value = NA)
+
+
+
+establecimientos_canada %>% filter(Province == "ON") %>% summarise(n = sum(Total))
+
+establecimientos_canada %>% count(NAME)
+
+df
+
+df %>% summarise(sum(total))
+
+
+#CHILE
+establecimientos_chile <- left_join(Establecimientos_ChileDEIS_MINSAL_12_06_2020_camas_privados, Establecimientos_ChileDEIS_MINSAL_12_06_2020_, by = "codigo_establecimiento")
+
+
+establecimientos_chile %>% filter(Dependencia == "Privado" & Area == "total") %>%
+  mutate(`Nombre Comuna` = reorder(`Nombre Comuna`, camas)) %>%
+  ggplot(aes(`Nombre Comuna`, camas, fill = `Nombre Comuna`)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(trans = "log2") +
+  xlab("")
+
+Establecimientos_ChileDEIS_MINSAL_12_06_2020_camas_privados %>% filter(`C?digo ?rea` == "total") %>%
+  count(nombre_establecimiento)
+
+Establecimientos_ChileDEIS_MINSAL_12_06_2020_camas_privados %>% filter(`C?digo ?rea` == "total") %>%
+  count(camas)
+
+map_data(map, region = "chile")
+
+map_data("usa") # we already did this, but we can do it again
+ggplot() + geom_polygon(data = usa, aes(x=long, y = lat, group = group)) + 
+  coord_fixed(1.3)
+
+#COLOMBIA
+
+
+
+establecimientos_colombia <- inner_join(Listado_de_Instituciones_de_Salud_colombia, Listado_de_Instituciones_de_Salud_colombia_camas, by = "nitsnit")
+
+
+
+establecimientos_colombia <-Listado_de_Instituciones_de_Salud_colombia_camas %>% group_by(`nom sede IPS`) %>% mutate(total_camas = (sum(camas)))
+
+df <- establecimientos_colombia %>% filter(naturaleza != "P?blica") %>% summarise(total = sum(camas))
+
+df %>% summarise(sum(total))
+
+write.csv(df, "c:/df.cvs", row.names = TRUE, sep = ",")
+                                    
+establecimientos_colombia %>% group_by(`nom sede IPS`) %>% filter(naturaleza == "Privada") %>%
+  ggplot(aes(nomdepto, total_camas, fill = nomdepto)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(trans = "log2") +
+  xlab("")
+
+# M?XICO
+
+url <- "http://www.dgis.salud.gob.mx/descargas/datosabiertos/recursosSalud/clues_2013.kmz"
+dat <- read_csv(url)
+download.file(url, "establecimientos_mexico.csv")
+tempfile()
+tmp_filename <- tempfile()
+download.file(url, tmp_filename)
+dat <- read_csv(tmp_filename)
+file.remove(tmp_filename)
+
+#USA
+
+
+usa_hosp_database <- usa_hosp_database %>% filter(STATUS == "OPEN" & BEDS >= 40 & POPULATION >= 1)
+
+usa_hosp_database <- usa_hosp_database %>% group_by(STATE) %>% mutate(state_population = (sum(POPULATION)*1000))
+
+usa_hosp_database <- usa_hosp_database %>% group_by(CITY) %>% mutate(city_population = (sum(POPULATION)*1000))
+
+usa_hosp_database <- usa_hosp_database %>% group_by(STATE) %>% mutate(state_beds = sum(BEDS))
+
+usa_hosp_database <- usa_hosp_database %>% group_by(CITY) %>% mutate(city_beds = sum(BEDS))
+
+usa_hosp_database <- usa_hosp_database %>% group_by(STATE) %>% mutate(beds_rate = state_beds/state_population)
+
+usa_hosp_database %>% group_by(STATE) %>% filter(state_population >= 5000000) %>%
+  ggplot() +
+  geom_point(aes(x = state_population, y = beds_rate, col=STATE), size = 3) +
+  geom_text(aes(state_population, beds_rate, label = STATE), nudge_x = 0.05) +
+  xlab("Popula??o (log scale)") +
+  ylab("Total Leitos por Estado (log scale)") +
+  ggtitle("USA Leitos por Estado e Popula??o")
+
+usa_hosp_database %>%  filter(state_beds >= 15000) %>%
+  ggplot(aes(STATE, BEDS, fill = STATE)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(trans = "log2") +
+  xlab("")
+
+usa_hosp_database %>% mutate(STATE = reorder(STATE, BEDS)) %>%
+  ggplot(aes(STATE, BEDS, fill = STATE)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(trans = "log2") +
+  xlab("")
+
+DF3 <- usa_hosp_database %>%  filter(STATUS == "OPEN" & STATE =="FL") %>% group_by(ID) %>% summarise(total =sum(BEDS)) 
+
+df2
+
+DF3 %>% summarise(sum(total)) 
+
+usa_hosp_database %>% ggplot(aes(BEDS, ID, color = STATE)) +
+  geom_point() +
+  geom_vline(xintercept = 0.065, lty = 2) +
+  geom_segment(x = -0.2, y = 10.54, xend = 0.065, yend = 10.54,
+               color = "black", lty = 2)
+
+hospitais <- inner_join(rlEstabComplementar202003, tbEstabelecimento202003, by = "CO_UNIDADE")
+
+
+head(hospitais)
+
+hospitais_por_leito <- select(hospitais, CO_UNIDADE, NO_RAZAO_SOCIAL, NO_FANTASIA, CO_CEP, CO_MUNICIPIO_GESTOR, CO_TIPO_LEITO, QT_EXIST) %>% 
+  group_by(CO_UNIDADE) %>% 
+  mutate(leitos_totais_por_hospital = sum(QT_EXIST))
+
+
+hospitais_por_leito_test1 <- select(hospitais_por_leito, CO_UNIDADE, NO_RAZAO_SOCIAL, NO_FANTASIA, CO_CEP, CO_MUNICIPIO_GESTOR, CO_TIPO_LEITO, QT_EXIST, leitos_totais_por_hospital) %>% 
+  group_by(CO_CEP) %>% 
+  mutate(leitos_totais_cep = sum(QT_EXIST))
+
+hospitais_por_leito <- inner_join(hospitais_por_leito, tbMunicipio202003, by = "CO_MUNICIPIO_GESTOR")
+
+hospitais_por_leito_test3 <- select(hospitais_por_leito_test2, CO_UNIDADE, NO_RAZAO_SOCIAL, NO_FANTASIA, CO_CEP, CO_MUNICIPIO_GESTOR, NO_MUNICIPIO, CO_SIGLA_ESTADO, CO_TIPO_LEITO, QT_EXIST, leitos_totais_por_hospital, leitos_totais_cep)
+
+hospitais_por_leito_test4 <- select(hospitais_por_leito_test3, CO_UNIDADE, NO_RAZAO_SOCIAL, NO_FANTASIA, CO_CEP, 
+                                    CO_MUNICIPIO_GESTOR, NO_MUNICIPIO, CO_SIGLA_ESTADO, CO_TIPO_LEITO, QT_EXIST, leitos_totais_por_hospital, leitos_totais_cep) %>% 
+  group_by(NO_MUNICIPIO) %>% 
+  mutate(leitos_totais_municipio = sum(QT_EXIST))
+
+hospitais_por_leito_test5 <- select(hospitais_por_leito_test4, CO_UNIDADE, NO_RAZAO_SOCIAL, NO_FANTASIA, CO_CEP, 
+                                    CO_MUNICIPIO_GESTOR, NO_MUNICIPIO, CO_SIGLA_ESTADO, CO_TIPO_LEITO, QT_EXIST, leitos_totais_por_hospital, leitos_totais_cep, leitos_totais_municipio) %>% 
+  group_by(CO_SIGLA_ESTADO) %>% 
+  mutate(leitos_totais_estado = sum(QT_EXIST))
+
+hospitais_por_leito_test6 <- inner_join(hospitais_por_leito_test5, demo_brasil, by = "CO_SIGLA_ESTADO")
+
+hospitais_por_leito_test6
+
+hospitais_por_leito_final <- hospitais_por_leito_test6 %>% mutate(taxa_leitos_estado = leitos_totais_estado.x/(Population/10^6))
+
+head(hospitais_por_leito_final)
+
+maiores_hospitais <- hospitais_por_leito %>% filter(leitos_totais_por_hospital <= 50)
+
+write.csv(hospitais_campanha_covid, "hospitais_campanha_covid.csv")
+
+
+#Taxa de leitos por população e estado
+hospitais_por_leito_final  %>%
+  ggplot(aes(taxa_leitos_estado, CO_SIGLA_ESTADO, fill = taxa_leitos_estado)) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  scale_fill_gradient(low = "green", high = "blue", na.value = NA)
+
+#leitos totais por estado e população
+hospitais_por_leito_final %>% group_by(CO_SIGLA_ESTADO) %>% 
+  ggplot() +
+  geom_point(aes(x = Population/10^6, y = leitos_totais_estado.x, col=Region), size = 3) +
+  geom_text(aes(Population/10^6, leitos_totais_estado.x, label = CO_SIGLA_ESTADO), nudge_x = 0.05) +
+  scale_x_continuous(trans = "log10") +
+  scale_y_continuous(trans = "log10") +
+  xlab("Popula??o /10^6 (log scale)") +
+  ylab("Total Leitos por Estado (log scale)") +
+  ggtitle("Leitos por Estado e Popula??o")
+
+# Taxa de leitos por estado e população por DGP em U$D 
+hospitais_por_leito_final %>% group_by(CO_SIGLA_ESTADO) %>% 
+  ggplot() +
+  geom_point(aes(x = `GDP in U$D`/(Population/10^6), y = taxa_leitos_estado  , col=Region), size = 3) +
+  geom_text(aes(`GDP in U$D`/(Population/10^6), taxa_leitos_estado, label = CO_SIGLA_ESTADO), nudge_x = 0.04) +
+  xlab("GDP em U$D per capita") +
+  ylab("Taxa de leitos por 100k popula??o") +
+  ggtitle("Taxa de leitos por estado e DGP em U$D por popula??o")
+
+
+
+
+
+
+
+hospitais_campanha_covid <- hospitais_por_leito_final %>% filter(leitos_totais <= 50 & CO_TIPO_LEITO == "1")
+
+head(hospitais_campanha_covid)
+
+write.csv(hospitais_campanha_covid, "c:/hospitais_campanha_covid.csv", row.names = TRUE, sep = ",")
+
+leitos_estado <- hospitais_por_leito_final %>%  
+  select(CO_SIGLA_ESTADO, state, Region, Population, leitos_totais_estado, `GDP in U$D` , taxa_leitos_estado) 
+
+head(leitos_cidade_estado)
+ 
+
+
+leitos_estado %>% rename(city = NO_MUNICIPIO, state = CO_SIGLA_ESTADO) 
+
+leitos_cidade_estado %>% filter(which.max(leitos_cidade))
+
+write.csv(hospitais_por_leito, "hospitais_por_leito.csv")
+
+head(leitos)
+
+hospitais_por_leito_filtrado <- hospitais_por_leito_filtrado %>% filter(leitos_totais_por_hospital >= 300)
+
+qplot(hospitais_por_leito_filtrado$leitos_totais_por_hospital)
+
+
+
+hospitais_por_leito_final %>% group_by(state) %>%
+  ggplot() +
+  boxplot(aes(estado, sum(leitos)))
+
+#USA DATABASE
+
+
+  usa_hosp_database <- usa_hosp_database %>% filter(STATUS == "OPEN" & BEDS >= 40 & POPULATION >= 1)
+  
+  usa_hosp_database <- usa_hosp_database %>% group_by(STATE) %>% mutate(state_population = (sum(POPULATION)*1000))
+  
+  usa_hosp_database <- usa_hosp_database %>% group_by(CITY) %>% mutate(city_population = (sum(POPULATION)*1000))
+  
+  usa_hosp_database <- usa_hosp_database %>% group_by(STATE) %>% mutate(state_beds = sum(BEDS))
+  
+  usa_hosp_database <- usa_hosp_database %>% group_by(CITY) %>% mutate(city_beds = sum(BEDS))
+  
+  usa_hosp_database <- usa_hosp_database %>% group_by(STATE) %>% mutate(beds_rate = state_beds/state_population)
+  
+ usa_hosp_database %>% group_by(STATE) %>% filter(state_population >= 5000000) %>%
+    ggplot() +
+    geom_point(aes(x = state_population, y = beds_rate, col=STATE), size = 3) +
+    geom_text(aes(state_population, beds_rate, label = STATE), nudge_x = 0.05) +
+    xlab("Popula??o (log scale)") +
+    ylab("Total Leitos por Estado (log scale)") +
+    ggtitle("USA Leitos por Estado e Popula??o")
+ 
+usa_hosp_database %>%  filter(state_beds >= 15000) %>%
+   ggplot(aes(STATE, BEDS, fill = STATE)) +
+   geom_boxplot() +
+   geom_point(alpha = 0.5) +
+   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+   scale_y_continuous(trans = "log2") +
+   xlab("")
+
+usa_hosp_database %>%  filter(city_population >= 2500000) %>%
+  mutate(CITY = reorder(CITY, BEDS)) %>%
+  ggplot(aes(CITY, BEDS, fill = STATE)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(trans = "log2") +
+  xlab("")
+
+usa_hosp_database %>%  filter(STATE == "FL" & city_population >= 300000) %>%
+  mutate(CITY = reorder(CITY, BEDS)) %>%
+  ggplot(aes(CITY, BEDS, fill = COUNTY)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(trans = "log2") +
+  xlab("")
+
+usa_hosp_database %>% ggplot(aes(BEDS, ID, color = STATE)) +
+  geom_point() +
+  geom_vline(xintercept = 0.065, lty = 2) +
+  geom_segment(x = -0.2, y = 10.54, xend = 0.065, yend = 10.54,
+               color = "black", lty = 2)    
+
+
+canadian_beds <-canadian_beds %>%  group_by(`Health region`) %>% mutate(BEDS = sum(Total))
+
+
+canadian_beds %>% mutate(Total = reorder(Total, `Health region`))
+  ggplot(aes(Total, `Health region`, color = 'Health region')) +
+  geom_point() +
+  geom_vline(xintercept = 0.065, lty = 2) +
+  geom_segment(x = -0.2, y = 10.54, xend = 0.065, yend = 10.54,
+               color = "black", lty = 2)
+
+canadian_beds %>% filter(count(`Health region`) >= 1)
+  ggplot(aes(`Health region`, Total)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(trans = "log2") +
+  xlab("")
+
+  #SPAIN
+  
+  poblacion_esp_ciu <- read_excel("~/System/Relatórios gerenciais/Analytics/homeoffice_work/poblacion_esp_ciu.xlsx", 
+                                  col_types = c("text", "numeric"))
+  
+  CNH_2020 <- read_excel("~/System/Relatórios gerenciais/Analytics/homeoffice_work/CNH_2020.xlsx", 
+                         col_types = c("numeric", "numeric", "text", 
+                                       "text", "text", "text", "numeric", 
+                                       "numeric", "text", "numeric", "text", 
+                                       "numeric", "text", "numeric", "numeric", 
+                                       "text", "text", "numeric", "text", 
+                                       "text", "text", "text", "text", "text", 
+                                       "text"))
+  
+
+ CNH_2020 %>% group_by(CCAA, Municipio) %>% 
+     summarize(
+     'hospitales'=n_distinct(`Nombre Centro`),
+     'total_camas'=sum(CAMAS)
+   ) %>% knitr::kable()
+
+CNH_2020 %>% 
+  ggplot(aes(Provincia, CAMAS, fill = CCAA)) +
+  geom_boxplot(coef=3) +
+  geom_jitter(width = 0.1, alpha = 0.2) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle("")
+
+CNH_2020  %>%  group_by(Provincia, CCAA, `Nombre Centro`, CAMAS) %>%
+  summarize(
+    'hospitales'=n_distinct(`Nombre Centro`),
+    'total_camas'=sum(CAMAS)
+  )  %>%
+  ggplot(aes(hospitales, CAMAS, fill = CCAA)) +
+  geom_point(aes(col=CCAA)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle("")
+  
+CNH_2020_1 <- CNH_2020  %>%  group_by(CCAA, Público) %>% filter(Público == "SÍ") %>%
+    summarize(
+    'hospitales'=n_distinct(`Nombre Centro`),
+    'total_camas'=sum(CAMAS)
+  ) 
+
+CNH_2020_3 <- CNH_2020  %>%  group_by(Municipio, CCAA) %>%
+  summarize(
+    'hospitales'=n_distinct(`Nombre Centro`),
+    'total_camas'=sum(CAMAS)
+  ) 
+
+CNH_2020_2 <- CNH_2020  %>%  group_by(Municipio, Público, CCAA) %>%
+  summarize(
+    'hospitales'=n_distinct(`Nombre Centro`),
+    'total_camas'=sum(CAMAS)
+  ) 
+
+CNH_2020_2 <- inner_join(CNH_2020_2, poblacion_esp_ciu, by = "Municipio")
+
+CNH_2020_3 <- inner_join(CNH_2020_3, poblacion_esp_ciu, by = "Municipio")
+
+CNH_2020_1 <- inner_join(CNH_2020_1, poblacion_esp, by = "CCAA")
+
+CNH_2020_1  %>% filter(Público.y == "SÍ") %>% mutate(camas_por_hab = total_camas / pob) %>% 
+  ggplot(aes(`Coste Medio AP`, camas_por_hab, color = CCAA, label = label)) +
+  geom_point() +
+  scale_shape_manual(values=seq(0, 10)) + 
+  ylab("Camas por Habitante") +
+  xlab("Coste por hospitalización") +
+  geom_label_repel(aes(label = label), box.padding = 0.35, point.padding = 0.5, segment.color = 'grey50') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle("Coste promedio por hospitalización vs tasa de Camas por habitante y CCAA @Miguel Á. Boto")
+
+CNH_2020_2 %>% filter(Habitantes >= 200000)  %>%
+  mutate(as.numeric(Habitantes)) %>% mutate(camas_por_hab = total_camas / Habitantes) %>%
+  ggplot(aes(hospitales, camas_por_hab, color = CCAA, shape = Público, label = Municipio)) +
+  geom_point() +
+  scale_shape_manual(values=seq(0, 10)) + 
+  ylab("Camas por Habitante") +
+  xlab("Nº de Hospitales") +
+  geom_label_repel(aes(label = Municipio), box.padding = 0.35, point.padding = 0.5, segment.color = 'grey50') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle("Camas y Hospitales por Ciudad @Miguel Á. Boto")
+
+
+CNH_2020_3 %>% filter(Habitantes >= 100000, Habitantes <= 199999) %>%
+  mutate(as.numeric(Habitantes)) %>% mutate(camas_por_hab = total_camas / Habitantes) %>%
+  ggplot(aes(hospitales, camas_por_hab, color = CCAA,  label = Municipio)) +
+  geom_point() +
+  scale_shape_manual(values=seq(0, 10)) + 
+  ylab("Camas por Habitante") +
+  xlab("Nº de Hospitales") +
+  geom_label_repel(aes(label = Municipio), box.padding = 0.35, point.padding = 0.5, segment.color = 'grey50') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle("Hospitales por Ciudad > 100k @Miguel Á. Boto")
+
+CNH_2020_1  %>% filter(Público.y == "SÍ") %>% ggplot(aes(CAMAS, CCAA)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  xlab("")
+
+CNH_2020 %>% filter(Público == "NO",  CCAA == "Madrid, Comunidad de") %>% 
+  select(`Nombre Centro`, CAMAS, Municipio, `Dependencia Funcional`) %>% 
+  arrange(desc(CAMAS)) %>%
+  knitr::kable()
+
+CNH_2020 %>% filter(Público == "NO", CCAA == "Andalucía") %>% 
+  mutate(`Nombre Centro` = reorder(`Nombre Centro`, CAMAS)) %>%
+  ggplot(aes( CAMAS, `Nombre Centro`)) +
+  geom_bar(stat = "identity")
+
+CNH_2020 %>% summarise(sum(CAMAS))
+  
+CNH_2020 %>% 
+  filter(Público == "NO") %>%
+   mutate(Municipio = reorder(Municipio, CAMAS)) %>%
+  ggplot(aes(CAMAS, Municipio, color = CCAA)) +
+  geom_boxplot()
+
+CNH_2020_1 %>%  filter(Público.y == "SÍ", CCAA != "Ceuta",  CCAA != "Melilla") %>% mutate(camas_habitante = total_camas / pob, coste_medio = coste_total / pob) %>%
+  ggplot(aes(camas_habitante, hospitales, color = coste_medio)) + geom_point() +
+  scale_shape_manual(values=seq(0, 10)) + 
+  ylab("Población") +
+  xlab("Camas por Habitante") +
+  geom_label_repel(aes(label = CCAA), box.padding = 0.35, point.padding = 0.5, segment.color = 'grey50') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle("Densidad de población y camas por habitante @Miguel Á. Boto")
+
+camas_mundial <- read_excel("~/System/Relatórios gerenciais/Analytics/homeoffice_work/camas_mundial.xlsx", 
+                            col_types = c("text", "numeric", "text"))
+
+gasto_saude_mundial <- read_excel("~/System/Relatórios gerenciais/Analytics/homeoffice_work/gasto_saude_mundial.xlsx", 
+                                  col_types = c("text", "numeric", "numeric", 
+                                                "numeric", "numeric", "numeric", 
+                                                "numeric", "numeric", "numeric"))
+
+inversion_mundial_salud <- inner_join(gasto_saude_mundial, camas_mundial, by ="Países")
+
+inversion_mundial_salud <- inversion_mundial_salud %>% mutate(gasto_por_habitante = `Gasto Salud (M.€)` / `Población (M)`, 
+                                   camas_totales = ((camas_1k_hab*(`Población (M)`*1000000))/1000))
+  
+inversion_mundial_salud %>%  filter(Países %in% c("Estados Unidos", "Reino Unido", "Panamá", "Costa Rica", "Uruguay", "Paraguay", "Italia", 
+                                                  "España", "Canadá", "México", "Brasil", "Argentina", "Perú", 
+                                                  "Chile", "Colombia", "Portugal", "Irlanda")) %>% 
+  ggplot(aes(`Gasto Salud (M.€)`, camas_totales, color = Continente)) +
+  geom_point() +
+  geom_label_repel(aes(label = Países), box.padding = 0.35, point.padding = 0.5, segment.color = 'grey50') 
+
+inversion_mundial_salud %>%  filter(Países %in% c("Estados Unidos", "Reino Unido", "Panamá", "Costa Rica", "Uruguay", "Paraguay", "Italia", "España", "Canadá", "México", "Brasil", "Argentina", "Perú", 
+                                                  "Chile", "Colombia", "Portugal", "Irlanda")) %>% 
+  ggplot(aes(gasto_por_habitante, camas_1k_hab, color = Continente)) +
+  geom_point() +
+  geom_label_repel(aes(label = Países), box.padding = 0.35, point.padding = 0.5, max.overlaps = Inf, segment.color = 'grey50')
+
+inversion_mundial_salud %>%  filter(Países %in% c("Panamá", "Costa Rica", "Uruguay", "Paraguay", "Italia", "España", "Canadá", "México", "Brasil", "Argentina", "Perú", 
+                                                  "Chile", "Colombia", "Portugal", "Irlanda")) %>% 
+  ggplot(aes(gasto_por_habitante, camas_totales, color = `G. Salud %PIB`)) +
+  geom_point() +
+  geom_label_repel(aes(label = Países), box.padding = 0.35, point.padding = 0.5, segment.color = 'grey50')
+
+resumo %>% mutate(HOSPITAIS = reorder(HOSPITAIS, TIPO)) %>%
+  filter(HOSPITAIS != 0) %>% 
+  ggplot(aes(TIPO, HOSPITAIS, fill = TIPO)) +
+  geom_bar(stat="identity")
+  
+class(resumo$HOSPITAIS)
+  
+## portugal ##
+
+
+
+portugal <- fromJSON("https://dados.gov.pt/pt/datasets/r/1b4b2375-3c7b-48df-b499-5aedf4e5d675", flatten = TRUE)
+
+
+portugal <- as.data.frame(portugal)
+
+portugal <-  portugal[[7]][[1]]
+
+head(portugal)
+
+portugal <- portugal %>% select(geocod, geodsg, dim_3, dim_3_t, sinal_conv, sinal_conv_desc, valor)
+
+colnames(portugal)[2] <- "Localidade"
+
+portugal_join <- right_join(hospitais_portugal,portugal, by = "Localidade")
